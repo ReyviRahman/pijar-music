@@ -1,0 +1,30 @@
+import {chromium} from '@playwright/test';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const page=await browser.newPage({viewport:{width:1366,height:699}});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://localhost:5173/#discover');
+await page.getByRole('button',{name:/Synchronize concert poster/}).click();
+await page.getByRole('heading',{name:'Detail Concert',exact:true}).waitFor();
+await page.evaluate(()=>document.fonts.ready);
+await page.screenshot({path:'detail-desktop.png',fullPage:true});
+await page.getByRole('link',{name:'Buy',exact:true}).click();
+await page.getByRole('heading',{name:'Choose Seat'}).waitFor();
+assert.equal(await page.locator('.seat[aria-pressed=true]').count(),2);
+await page.screenshot({path:'buy-desktop.png',fullPage:true});
+await page.getByRole('button',{name:'Seat 1',exact:true}).click();
+assert.equal(await page.locator('.booking-info .purchase-row strong').textContent(),'$120');
+await page.getByRole('button',{name:'Buy Ticket',exact:true}).click();
+await page.getByRole('heading',{name:'Payment successful'}).waitFor();
+await page.getByRole('link',{name:'Continue to donation'}).click();
+await page.getByRole('link',{name:'Skip for now'}).click();
+assert.equal(new URL(page.url()).hash,'#home');
+for(const route of ['concert/synchronize','buy-ticket','ticket-success','donate']){
+ await page.goto('http://localhost:5173/#'+route);await page.waitForTimeout(200);
+ assert.deepEqual(await page.locator('img').evaluateAll(imgs=>imgs.filter(i=>!i.complete||!i.naturalWidth).map(i=>i.src)),[]);
+ await page.setViewportSize({width:390,height:844});
+ await page.screenshot({path:route.replace('/','-')+'-mobile.png',fullPage:true});
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.setViewportSize({width:1366,height:699});
+}
+assert.deepEqual(errors,[]);await browser.close();console.log('PASS: prototype flow, selected seats, total, local assets, mobile overflow, browser errors');
